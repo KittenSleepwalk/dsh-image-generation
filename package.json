@@ -1,0 +1,76 @@
+{
+  "name": "@kittensleepwalk/dsh-image-generation",
+  "version": "0.2.4",
+  "description": "DSH 图像生成插件：自动管理本地 ComfyUI，调用 Qwen-Image-2.1（int8 / w4a8，16GB 显存优化）。模型可关键词搜索、下载、切换、删除；带设置页与一键打开 ComfyUI。支持文生图、图生图、遮罩局部修改和精确保留线条的改色。",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./package.json": "./package.json",
+    "./cordis.patch.yml": "./cordis.patch.yml"
+  },
+  "files": [
+    "lib",
+    "scripts",
+    "docs",
+    "assets",
+    "icon.svg",
+    "cordis.patch.yml",
+    "install.ps1",
+    "install.cmd",
+    "uninstall.ps1",
+    "start-server.cmd",
+    "README.md",
+    "README.zh-CN.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "comfyui",
+    "qwen-image",
+    "qwen-image-2.1",
+    "text2img",
+    "image-generation",
+    "model-manager",
+    "图片生成",
+    "文生图"
+  ],
+  "meta": {
+    "title": "Qwen-Image-2.1 图像生成（KS）",
+    "description": "聊天里一句话出图：自动拉起本地 ComfyUI，Qwen-Image-2.1 出图；模型可搜索/下载/切换/删除，设置页可一键打开 ComfyUI 前端。"
+  },
+  "icon": "./icon.svg",
+  "author": "kittensleepwalk",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/KittenSleepwalk/dsh-image-generation.git"
+  },
+  "homepage": "https://github.com/KittenSleepwalk/dsh-image-generation#readme",
+  "bugs": {
+    "url": "https://github.com/KittenSleepwalk/dsh-image-generation/issues"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.2.0-rc.1"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": []
+    }
+  },
+  "scripts": {
+    "doctor": "node scripts/doctor.mjs",
+    "test": "node scripts/test-workflow.mjs"
+  }
+}

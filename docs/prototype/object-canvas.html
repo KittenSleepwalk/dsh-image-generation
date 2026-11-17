@@ -1,0 +1,871 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>对象图层画布 · 原型</title>
+<style>
+  :root{
+    --bg:#080d16; --panel:#0d1422; --panel2:#121c2e; --line:#22304a;
+    --text:#dbe6f5; --dim:#8296b3; --accent:#4da3ff; --pink:#ff5fa2;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%;margin:0}
+  body{
+    background:var(--bg); color:var(--text); overflow:hidden;
+    font:13px/1.5 "Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+    display:flex; flex-direction:column;
+  }
+  header{
+    height:46px; flex:none; display:flex; align-items:center; gap:10px;
+    padding:0 14px; border-bottom:1px solid var(--line); background:var(--panel);
+  }
+  header h1{font-size:13px; margin:0; font-weight:600; letter-spacing:.3px}
+  header .tag{font-size:11px; color:var(--dim); border:1px solid var(--line); padding:1px 7px; border-radius:99px}
+  header .sp{flex:1}
+  button, select, input{
+    font:inherit; color:var(--text); background:var(--panel2);
+    border:1px solid var(--line); border-radius:6px; padding:4px 9px; cursor:pointer;
+  }
+  button:hover{border-color:#3a5170}
+  button.primary{background:#17395e; border-color:#2b6ea8; color:#dceeff}
+  button.ghost{background:transparent}
+  input[type=number]{width:68px; cursor:text}
+  input[type=text]{cursor:text}
+  main{flex:1; display:flex; min-height:0}
+  aside{background:var(--panel); display:flex; flex-direction:column; min-height:0}
+  aside.left{width:248px; border-right:1px solid var(--line)}
+  aside.right{width:308px; border-left:1px solid var(--line)}
+  .ph{
+    flex:none; height:34px; display:flex; align-items:center; gap:8px;
+    padding:0 12px; font-size:11px; color:var(--dim); letter-spacing:.6px;
+    border-bottom:1px solid var(--line); text-transform:uppercase;
+  }
+  .ph .sp{flex:1}
+  #layerList{flex:1; overflow:auto; padding:6px}
+  .row{
+    display:flex; align-items:center; gap:7px; padding:5px 7px; border-radius:6px;
+    cursor:pointer; user-select:none; margin-bottom:2px;
+  }
+  .row:hover{background:#16213a}
+  .row.on{background:#17395e; outline:1px solid #2b6ea8}
+  .row .ic{width:18px; text-align:center; color:var(--dim); font-size:12px}
+  .row .nm{flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+  .row .nm.dim{color:#5d6f8c}
+  .row .tg{color:#6f83a3; font-size:11px}
+  .row .tg.on{color:var(--accent)}
+  .stage{flex:1; position:relative; min-width:0; background:#070b12}
+  canvas#cv{display:block; width:100%; height:100%; cursor:default; touch-action:none}
+  .hint{
+    position:absolute; left:14px; bottom:12px; font-size:11px; color:#5f7392;
+    background:rgba(8,13,22,.72); border:1px solid var(--line); border-radius:6px; padding:5px 9px;
+    pointer-events:none;
+  }
+  .zoom{position:absolute; right:12px; bottom:12px; display:flex; gap:6px}
+  .zoom button{padding:2px 8px; font-size:12px}
+  .sec{border-bottom:1px solid var(--line); padding:10px 12px}
+  .sec h3{margin:0 0 8px; font-size:11px; color:var(--dim); font-weight:600; letter-spacing:.6px}
+  .grid8{display:grid; grid-template-columns:repeat(4,1fr); gap:6px}
+  .vw{position:relative; border:1px solid var(--line); border-radius:6px; overflow:hidden; background:#0a1120; cursor:pointer}
+  .vw canvas{display:block; width:100%; height:auto}
+  .vw.on{outline:2px solid var(--accent); border-color:transparent}
+  .vw span{position:absolute; left:3px; top:1px; font-size:10px; color:#7f93b0}
+  .kv{display:grid; grid-template-columns:64px 1fr; gap:6px 8px; align-items:center}
+  .kv label{color:var(--dim); font-size:12px}
+  .kv .line{display:flex; gap:6px; align-items:center}
+  .btnrow{display:flex; gap:6px; flex-wrap:wrap}
+  .btnrow button{flex:1; padding:3px 0; font-size:12px; white-space:nowrap}
+  footer{
+    flex:none; height:58px; border-top:1px solid var(--line); background:var(--panel);
+    display:flex; align-items:center; gap:10px; padding:0 14px;
+  }
+  footer .lbl{font-size:11px; color:var(--dim); white-space:nowrap}
+  footer input[type=text]{flex:1; cursor:text}
+  .disabled{opacity:.45; cursor:not-allowed}
+  .swatch{display:flex; gap:5px}
+  .swatch i{width:16px; height:16px; border-radius:4px; border:1px solid rgba(255,255,255,.2); cursor:pointer; display:block}
+  .swatch i.on{outline:2px solid var(--accent)}
+</style>
+</head>
+<body>
+<header>
+  <h1>对象图层画布</h1>
+  <span class="tag">原型 · 零件是占位图形，接 ComfyUI 后换成透明 PNG</span>
+  <span class="sp"></span>
+  <button id="btnDemo" class="ghost">重放演示场景</button>
+  <button id="btnExport" class="primary">导出 PNG</button>
+</header>
+
+<main>
+  <aside class="left">
+    <div class="ph">
+      <span>图层（上 → 下）</span><span class="sp"></span>
+      <select id="addKind" style="padding:2px 4px;font-size:12px">
+        <option value="nucleus">细胞核</option>
+        <option value="mito">线粒体</option>
+        <option value="golgi">高尔基体</option>
+        <option value="vesicle">囊泡</option>
+        <option value="membrane">细胞膜</option>
+      </select>
+      <button id="btnAdd" style="padding:2px 6px;font-size:12px">＋</button>
+    </div>
+    <div id="layerList"></div>
+    <div class="sec">
+      <h3>画布</h3>
+      <div class="kv">
+        <label>底色</label>
+        <div class="swatch" id="bgSwatch"></div>
+        <label>网格</label>
+        <div class="line"><input type="checkbox" id="ckGrid" checked /><span style="color:var(--dim);font-size:12px">显示网格</span></div>
+        <label>吸附</label>
+        <div class="line"><input type="checkbox" id="ckSnap" checked /><span style="color:var(--dim);font-size:12px">对齐线吸附</span></div>
+      </div>
+    </div>
+  </aside>
+
+  <section class="stage">
+    <canvas id="cv"></canvas>
+    <div class="hint">拖动＝移动 · 角点＝等比缩放 · 顶部圆点＝旋转 · 方向键微移 · Del 删除</div>
+    <div class="zoom">
+      <button id="zOut">−</button><button id="zFit">适应</button><button id="zIn">＋</button>
+    </div>
+  </section>
+
+  <aside class="right">
+    <div class="ph"><span>检查器</span></div>
+    <div class="sec">
+      <h3>这个对象</h3>
+      <div class="kv">
+        <label>名称</label><input type="text" id="inName" />
+      </div>
+    </div>
+    <div class="sec">
+      <h3>变体（点一下换零件）</h3>
+      <div class="grid8" id="variants"></div>
+    </div>
+    <div class="sec">
+      <h3>位置与大小</h3>
+      <div class="kv">
+        <label>宽 / 高</label>
+        <div class="line"><input type="number" id="inW" /><input type="number" id="inH" /></div>
+        <label>旋转</label>
+        <div class="line"><input type="number" id="inRot" /><span style="color:var(--dim);font-size:11px">度</span></div>
+        <label>不透明</label>
+        <div class="line"><input type="range" id="inOpa" min="0.1" max="1" step="0.01" style="width:100%" /></div>
+        <label>接触阴影</label>
+        <div class="line"><input type="checkbox" id="ckShadow" /><span style="color:var(--dim);font-size:12px">让零件落在背景上</span></div>
+      </div>
+    </div>
+    <div class="sec">
+      <h3>层级</h3>
+      <div class="btnrow">
+        <button data-z="top">置顶</button><button data-z="up">上移</button>
+        <button data-z="down">下移</button><button data-z="bottom">置底</button>
+      </div>
+    </div>
+    <div class="sec">
+      <h3>对齐</h3>
+      <div class="btnrow">
+        <button data-align="cx">水平居中</button><button data-align="cy">垂直居中</button>
+        <button data-align="dup">复制一份</button><button data-align="del">删除</button>
+      </div>
+    </div>
+  </aside>
+</main>
+
+<footer>
+  <span class="lbl">选中对象的提示词</span>
+  <input type="text" id="inPrompt" placeholder="例如：一个圆形的细胞核，颗粒状染色质，紫色" />
+  <button id="btnRegen" class="disabled" title="接上 ComfyUI 后：用这条提示词再出 8 个变体">重新生成 8 个</button>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+
+  /* ---------------- 状态 ---------------- */
+  var S = {
+    W: 1600, H: 1000,
+    bg: "#0c1424",
+    layers: [],
+    sel: null,
+    grid: true,
+    snap: true,
+    view: { x: 0, y: 0, scale: 1 },
+    guides: null,
+    nextId: 1
+  };
+
+  var cv = document.getElementById("cv");
+  var ctx = cv.getContext("2d");
+  var checker = null;
+  var dpr = window.devicePixelRatio || 1;
+
+  /* ---------------- 工具 ---------------- */
+  function rng(seed){
+    var t = seed >>> 0;
+    return function(){
+      t += 0x6D2B79F5;
+      var r = Math.imul(t ^ (t >>> 15), 1 | t);
+      r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+      return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function clamp(v, a, b){ return v < a ? a : v > b ? b : v; }
+  function dist(a, b){ return Math.hypot(a.x - b.x, a.y - b.y); }
+  function uid(){ return "L" + (S.nextId++); }
+
+  function capsule(c, x, y, w, h, r){
+    r = Math.min(r, w / 2, h / 2);
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.lineTo(x + w - r, y); c.arcTo(x + w, y, x + w, y + r, r);
+    c.lineTo(x + w, y + h - r); c.arcTo(x + w, y + h, x + w - r, y + h, r);
+    c.lineTo(x + r, y + h); c.arcTo(x, y + h, x, y + h - r, r);
+    c.lineTo(x, y + r); c.arcTo(x, y, x + r, y, r);
+    c.closePath();
+  }
+
+  /* ---------------- 零件绘制（占位图形） ---------------- */
+  var HUE_N = [268, 286, 250, 300, 272, 258, 292, 276];
+  var HUE_M = [18, 32, 8, 26, 40, 14, 30, 22];
+
+  function drawNucleus(c, w, h, v){
+    var hue = HUE_N[v % 8], R = rng(1000 + v * 37);
+    var g = c.createRadialGradient(-w * 0.16, -h * 0.22, w * 0.04, 0, 0, w * 0.56);
+    g.addColorStop(0, "hsl(" + hue + " 72% 74%)");
+    g.addColorStop(0.62, "hsl(" + hue + " 56% 53%)");
+    g.addColorStop(1, "hsl(" + hue + " 62% 33%)");
+    c.beginPath();
+    var n = 56;
+    for (var i = 0; i <= n; i++){
+      var a = i / n * Math.PI * 2;
+      var wob = 1 + 0.038 * Math.sin(a * 3 + v) + 0.022 * Math.sin(a * 5 + v * 2.3);
+      var x = Math.cos(a) * w * 0.5 * wob, y = Math.sin(a) * h * 0.5 * wob;
+      if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+    }
+    c.closePath();
+    c.fillStyle = g; c.fill();
+    c.strokeStyle = "hsla(" + hue + ",60%,80%,.5)"; c.lineWidth = Math.max(1, w * 0.012); c.stroke();
+    c.save(); c.clip();
+    for (var k = 0; k < 10; k++){
+      var x0 = (R() - 0.5) * w * 0.72, y0 = (R() - 0.5) * h * 0.72;
+      c.beginPath(); c.moveTo(x0, y0);
+      for (var s = 1; s <= 4; s++){
+        c.lineTo(x0 + (R() - 0.5) * w * 0.3, y0 + (R() - 0.5) * h * 0.3);
+      }
+      c.strokeStyle = "hsla(" + hue + ",48%," + (58 + R() * 24) + "%," + (0.24 + R() * 0.3) + ")";
+      c.lineWidth = Math.max(1, w * (0.008 + R() * 0.012));
+      c.lineCap = "round"; c.stroke();
+    }
+    var nx = (R() - 0.5) * w * 0.3, ny = (R() - 0.5) * h * 0.3, nr = w * (0.1 + R() * 0.05);
+    var g2 = c.createRadialGradient(nx - nr * 0.3, ny - nr * 0.3, nr * 0.1, nx, ny, nr);
+    g2.addColorStop(0, "hsl(" + (hue + 8) + " 62% 42%)");
+    g2.addColorStop(1, "hsl(" + (hue + 8) + " 70% 24%)");
+    c.beginPath(); c.arc(nx, ny, nr, 0, Math.PI * 2); c.fillStyle = g2; c.fill();
+    c.restore();
+  }
+
+  function drawMito(c, w, h, v){
+    var hue = HUE_M[v % 8];
+    var hh = h * 0.34, x = -w / 2, y = -hh;
+    capsule(c, x, y, w, hh * 2, hh);
+    var g = c.createLinearGradient(0, -hh, 0, hh);
+    g.addColorStop(0, "hsl(" + hue + " 78% 64%)");
+    g.addColorStop(0.55, "hsl(" + hue + " 68% 50%)");
+    g.addColorStop(1, "hsl(" + hue + " 62% 38%)");
+    c.fillStyle = g; c.fill();
+    c.strokeStyle = "hsla(" + hue + ",60%,82%,.62)"; c.lineWidth = Math.max(1, w * 0.012); c.stroke();
+    c.save(); c.clip();
+    var R = rng(2000 + v * 53);
+    for (var i = 0; i < 8; i++){
+      var cx = x + (i + 0.6) * (w / 8.4);
+      c.beginPath(); c.moveTo(cx, -hh * 0.88);
+      c.bezierCurveTo(cx + w * 0.05, -hh * 0.28, cx - w * 0.05, hh * 0.28, cx, hh * 0.88);
+      c.strokeStyle = "hsla(" + hue + ",52%,90%," + (0.32 + R() * 0.2) + ")";
+      c.lineWidth = Math.max(1, w * 0.01); c.stroke();
+    }
+    c.restore();
+  }
+
+  function drawGolgi(c, w, h, v){
+    var hue = [42, 34, 50, 28, 46, 38, 52, 30][v % 8];
+    var R = rng(3000 + v * 29);
+    for (var i = 0; i < 4; i++){
+      var yy = -h * 0.3 + i * h * 0.2;
+      var ww = w * (0.92 - i * 0.1);
+      c.beginPath();
+      c.moveTo(-ww / 2, yy);
+      c.quadraticCurveTo(0, yy - h * 0.16, ww / 2, yy);
+      c.strokeStyle = "hsl(" + hue + " 72% " + (62 - i * 4) + "%)";
+      c.lineWidth = Math.max(2, h * 0.06);
+      c.lineCap = "round"; c.stroke();
+    }
+    for (var k = 0; k < 5; k++){
+      var vx = (R() - 0.5) * w * 0.8, vy = h * 0.34 + R() * h * 0.08;
+      c.beginPath(); c.arc(vx, vy, h * 0.035, 0, Math.PI * 2);
+      c.fillStyle = "hsla(" + hue + ",70%,72%,.75)"; c.fill();
+    }
+  }
+
+  function drawVesicle(c, w, h, v){
+    var hue = [190, 205, 178, 212, 196, 186, 200, 182][v % 8];
+    var r = Math.min(w, h) / 2;
+    var g = c.createRadialGradient(-r * 0.3, -r * 0.35, r * 0.1, 0, 0, r);
+    g.addColorStop(0, "hsl(" + hue + " 80% 76%)");
+    g.addColorStop(0.7, "hsl(" + hue + " 70% 58%)");
+    g.addColorStop(1, "hsl(" + hue + " 68% 44%)");
+    c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2);
+    c.fillStyle = g; c.fill();
+    c.strokeStyle = "hsla(" + hue + ",80%,88%,.6)"; c.lineWidth = Math.max(1, r * 0.06); c.stroke();
+    var R = rng(4000 + v * 17);
+    for (var i = 0; i < 4; i++){
+      var a = R() * Math.PI * 2, rr = R() * r * 0.55;
+      c.beginPath(); c.arc(Math.cos(a) * rr, Math.sin(a) * rr, r * (0.07 + R() * 0.06), 0, Math.PI * 2);
+      c.fillStyle = "hsla(" + hue + ",80%,92%,.35)"; c.fill();
+    }
+  }
+
+  function drawMembrane(c, w, h, v){
+    var hue = [188, 196, 176, 204, 190, 182, 200, 192][v % 8];
+    c.beginPath();
+    c.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
+    c.ellipse(0, 0, w / 2 - w * 0.035, h / 2 - h * 0.035, 0, 0, Math.PI * 2, true);
+    c.fillStyle = "hsla(" + hue + ",70%,56%,.16)";
+    c.fill("evenodd");
+    c.beginPath(); c.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2);
+    c.strokeStyle = "hsl(" + hue + " 74% 62%)"; c.lineWidth = Math.max(2, w * 0.008); c.stroke();
+    c.beginPath(); c.ellipse(0, 0, w / 2 - w * 0.035, h / 2 - h * 0.035, 0, 0, Math.PI * 2);
+    c.strokeStyle = "hsla(" + hue + ",70%,80%,.35)"; c.lineWidth = Math.max(1, w * 0.004); c.stroke();
+  }
+
+  function drawBg(c, w, h, v){
+    var g = c.createLinearGradient(-w / 2, -h / 2, w / 2, h / 2);
+    g.addColorStop(0, S.bg);
+    g.addColorStop(1, "#0a1a2e");
+    c.fillStyle = g;
+    c.fillRect(-w / 2, -h / 2, w, h);
+    var R = rng(900 + v);
+    for (var i = 0; i < 160; i++){
+      c.beginPath();
+      c.arc((R() - 0.5) * w, (R() - 0.5) * h, R() * 2.2 + 0.4, 0, Math.PI * 2);
+      c.fillStyle = "rgba(140,180,255," + (0.03 + R() * 0.06) + ")";
+      c.fill();
+    }
+  }
+
+  function drawPart(c, kind, w, h, v){
+    if (kind === "nucleus") return drawNucleus(c, w, h, v);
+    if (kind === "mito") return drawMito(c, w, h, v);
+    if (kind === "golgi") return drawGolgi(c, w, h, v);
+    if (kind === "vesicle") return drawVesicle(c, w, h, v);
+    if (kind === "membrane") return drawMembrane(c, w, h, v);
+    if (kind === "bg") return drawBg(c, w, h, v);
+  }
+
+  /* ---------------- 场景操作 ---------------- */
+  function addLayer(o){
+    var l = {
+      id: uid(),
+      kind: o.kind,
+      name: o.name || "图层",
+      variant: o.variant || 0,
+      x: o.x, y: o.y, w: o.w, h: o.h,
+      rot: o.rot || 0,
+      opacity: o.opacity == null ? 1 : o.opacity,
+      visible: o.visible !== false,
+      locked: !!o.locked,
+      shadow: o.shadow !== false,
+      prompt: o.prompt || ""
+    };
+    if (o.index == null) S.layers.push(l);
+    else S.layers.splice(o.index, 0, l);
+    return l;
+  }
+
+  function selLayer(){ return S.layers.find(function(l){ return l.id === S.sel; }) || null; }
+
+  function demo(){
+    S.layers = [];
+    S.sel = null;
+    addLayer({ kind: "bg", name: "背景 · 细胞外液", x: S.W / 2, y: S.H / 2, w: S.W, h: S.H, variant: 0, locked: true, shadow: false });
+    addLayer({ kind: "membrane", name: "细胞膜", x: S.W / 2, y: S.H / 2, w: 1200, h: 900, variant: 0, shadow: false });
+    addLayer({ kind: "nucleus", name: "细胞核 1", x: 640, y: 470, w: 300, h: 280, variant: 0, prompt: "一个圆形细胞核，颗粒状染色质，紫色" });
+    addLayer({ kind: "nucleus", name: "细胞核 2", x: 930, y: 640, w: 230, h: 220, variant: 3, rot: 0.2, prompt: "一个略扁的细胞核，深紫色" });
+    addLayer({ kind: "mito", name: "线粒体 1", x: 1000, y: 380, w: 190, h: 90, variant: 1, rot: -0.35 });
+    addLayer({ kind: "mito", name: "线粒体 2", x: 530, y: 700, w: 170, h: 82, variant: 4, rot: 0.5 });
+    addLayer({ kind: "mito", name: "线粒体 3", x: 1180, y: 700, w: 160, h: 78, variant: 6, rot: -0.2 });
+    addLayer({ kind: "golgi", name: "高尔基体", x: 780, y: 780, w: 240, h: 140, variant: 2, rot: -0.1 });
+    addLayer({ kind: "vesicle", name: "囊泡", x: 660, y: 620, w: 54, h: 54, variant: 2 });
+    addLayer({ kind: "vesicle", name: "囊泡", x: 700, y: 660, w: 40, h: 40, variant: 5 });
+    S.sel = S.layers[2].id;
+    fitView();
+    syncUI();
+    render();
+  }
+
+  /* ---------------- 视图 ---------------- */
+  function fitView(){
+    var r = cv.getBoundingClientRect();
+    var s = Math.min((r.width - 48) / S.W, (r.height - 48) / S.H);
+    S.view.scale = clamp(s, 0.05, 2);
+    S.view.x = (r.width - S.W * S.view.scale) / 2;
+    S.view.y = (r.height - S.H * S.view.scale) / 2;
+  }
+  function toScene(e){
+    var r = cv.getBoundingClientRect();
+    var sx = e.clientX - r.left, sy = e.clientY - r.top;
+    return { x: (sx - S.view.x) / S.view.scale, y: (sy - S.view.y) / S.view.scale, sx: sx, sy: sy };
+  }
+  function toScreen(x, y){
+    return { x: x * S.view.scale + S.view.x, y: y * S.view.scale + S.view.y };
+  }
+
+  function corners(l){
+    var co = Math.cos(l.rot), si = Math.sin(l.rot), hw = l.w / 2, hh = l.h / 2;
+    return [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(function(p){
+      return { x: l.x + p[0] * co - p[1] * si, y: l.y + p[0] * si + p[1] * co };
+    });
+  }
+  function rotHandle(l){
+    var co = Math.cos(l.rot), si = Math.sin(l.rot);
+    var yy = -l.h / 2 - 30 / S.view.scale;
+    return { x: l.x - yy * si, y: l.y + yy * co };
+  }
+  function hitLayer(p){
+    for (var i = S.layers.length - 1; i >= 0; i--){
+      var l = S.layers[i];
+      if (!l.visible || l.locked) continue;
+      var dx = p.x - l.x, dy = p.y - l.y;
+      var co = Math.cos(-l.rot), si = Math.sin(-l.rot);
+      var lx = dx * co - dy * si, ly = dx * si + dy * co;
+      if (Math.abs(lx) <= l.w / 2 && Math.abs(ly) <= l.h / 2) return l;
+    }
+    return null;
+  }
+
+  /* ---------------- 渲染 ---------------- */
+  function ensureChecker(){
+    if (checker) return checker;
+    var ck = document.createElement("canvas");
+    ck.width = ck.height = 24;
+    var c2 = ck.getContext("2d");
+    c2.fillStyle = "#131c2d"; c2.fillRect(0, 0, 24, 24);
+    c2.fillStyle = "#0f1728"; c2.fillRect(0, 0, 12, 12); c2.fillRect(12, 12, 12, 12);
+    checker = ctx.createPattern(ck, "repeat");
+    return checker;
+  }
+
+  function drawLayer(c, l){
+    c.save();
+    c.globalAlpha = l.opacity;
+    c.translate(l.x, l.y);
+    c.rotate(l.rot);
+    if (l.shadow && l.kind !== "bg" && l.kind !== "membrane"){
+      var rw = l.w * 0.56, rh = Math.max(8, l.h * 0.14);
+      c.save();
+      c.translate(0, l.h * 0.46);
+      c.scale(1, rh / rw);
+      var g = c.createRadialGradient(0, 0, 1, 0, 0, rw);
+      g.addColorStop(0, "rgba(0,0,0,.55)");
+      g.addColorStop(0.55, "rgba(0,0,0,.22)");
+      g.addColorStop(1, "rgba(0,0,0,0)");
+      c.beginPath(); c.arc(0, 0, rw, 0, Math.PI * 2);
+      c.fillStyle = g; c.fill();
+      c.restore();
+    }
+    drawPart(c, l.kind, l.w, l.h, l.variant);
+    c.restore();
+  }
+
+  function render(){
+    var r = cv.getBoundingClientRect();
+    var W = Math.max(1, Math.round(r.width * dpr));
+    var H = Math.max(1, Math.round(r.height * dpr));
+    if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, r.width, r.height);
+
+    ctx.save();
+    ctx.translate(S.view.x, S.view.y);
+    ctx.scale(S.view.scale, S.view.scale);
+
+    ctx.fillStyle = ensureChecker() || "#0f1728";
+    ctx.fillRect(0, 0, S.W, S.H);
+
+    for (var i = 0; i < S.layers.length; i++){
+      var l = S.layers[i];
+      if (l.visible) drawLayer(ctx, l);
+    }
+
+    if (S.grid && S.view.scale > 0.35){
+      ctx.strokeStyle = "rgba(120,160,220,.09)";
+      ctx.lineWidth = 1 / S.view.scale;
+      var step = 50;
+      for (var x = 0; x <= S.W; x += step){
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, S.H); ctx.stroke();
+      }
+      for (var y = 0; y <= S.H; y += step){
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(S.W, y); ctx.stroke();
+      }
+    }
+
+    var sl = selLayer();
+    if (sl){
+      var cs = corners(sl);
+      ctx.save();
+      ctx.strokeStyle = "#4da3ff";
+      ctx.lineWidth = 1.5 / S.view.scale;
+      ctx.setLineDash([6 / S.view.scale, 4 / S.view.scale]);
+      ctx.beginPath();
+      ctx.moveTo(cs[0].x, cs[0].y);
+      for (var k = 1; k < 4; k++) ctx.lineTo(cs[k].x, cs[k].y);
+      ctx.closePath(); ctx.stroke();
+      ctx.setLineDash([]);
+      var rh = 5 / S.view.scale;
+      cs.forEach(function(p){
+        ctx.beginPath(); ctx.arc(p.x, p.y, rh, 0, Math.PI * 2);
+        ctx.fillStyle = "#0b1220"; ctx.fill();
+        ctx.lineWidth = 1.5 / S.view.scale; ctx.strokeStyle = "#4da3ff"; ctx.stroke();
+      });
+      var rp = rotHandle(sl);
+      ctx.beginPath(); ctx.moveTo(cs[0].x, cs[0].y); ctx.lineTo(cs[1].x, cs[1].y); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(sl.x, sl.y - sl.h / 2 * 1).lineTo(rp.x, rp.y); ctx.stroke();
+      ctx.beginPath(); ctx.arc(rp.x, rp.y, rh * 1.15, 0, Math.PI * 2);
+      ctx.fillStyle = "#ff5fa2"; ctx.fill();
+      ctx.restore();
+    }
+
+    if (S.guides) drawGuides();
+    ctx.restore();
+  }
+
+  function drawGuides(){
+    var g = S.guides;
+    if (!g) return;
+    ctx.save();
+    ctx.strokeStyle = "#ff5fa2";
+    ctx.lineWidth = 1 / S.view.scale;
+    ctx.setLineDash([8 / S.view.scale, 6 / S.view.scale]);
+    g.forEach(function(line){
+      ctx.beginPath();
+      if (line.axis === "x"){ ctx.moveTo(line.v, 0); ctx.lineTo(line.v, S.H); }
+      else { ctx.moveTo(0, line.v); ctx.lineTo(S.W, line.v); }
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  /* ---------------- 交互 ---------------- */
+  var drag = null;
+
+  function beginDrag(e, mode, l, p){
+    drag = {
+      mode: mode,
+      id: l.id,
+      start: p,
+      x0: l.x, y0: l.y, w0: l.w, h0: l.h, r0: l.rot,
+      d0: Math.max(1, dist(p, { x: l.x, y: l.y })),
+      a0: Math.atan2(p.y - l.y, p.x - l.x)
+    };
+  }
+
+  cv.addEventListener("pointerdown", function(e){
+    if (e.button === 1){ return; }
+    cv.setPointerCapture(e.pointerId);
+    var p = toScene(e);
+    var sl = selLayer();
+
+    if (sl && !sl.locked){
+      var rp = rotHandle(sl);
+      var rhit = 12 / S.view.scale;
+      if (dist(p, rp) < rhit){ beginDrag(e, "rotate", sl, p); return; }
+      var cs = corners(sl);
+      for (var i = 0; i < cs.length; i++){
+        if (dist(p, cs[i]) < rhit){ beginDrag(e, "scale", sl, p); return; }
+      }
+    }
+
+    var hit = hitLayer(p);
+    if (hit){
+      if (S.sel !== hit.id){ S.sel = hit.id; syncUI(); }
+      beginDrag(e, "move", hit, p);
+      render();
+      return;
+    }
+    S.sel = null; syncUI(); render();
+  });
+
+  cv.addEventListener("pointermove", function(e){
+    var p = toScene(e);
+    if (!drag){
+      var sl = selLayer();
+      var cur = "default";
+      if (sl && !sl.locked){
+        if (dist(p, rotHandle(sl)) < 12 / S.view.scale) cur = "grab";
+        else {
+          var cs = corners(sl);
+          for (var i = 0; i < cs.length; i++) if (dist(p, cs[i]) < 12 / S.view.scale) cur = "nwse-resize";
+        }
+      }
+      if (cur === "default" && hitLayer(p)) cur = "move";
+      cv.style.cursor = cur;
+      return;
+    }
+    var l = S.layers.find(function(o){ return o.id === drag.id; });
+    if (!l) return;
+
+    if (drag.mode === "move"){
+      l.x = drag.x0 + (p.x - drag.start.x);
+      l.y = drag.y0 + (p.y - drag.start.y);
+      snapMove(l);
+    } else if (drag.mode === "scale"){
+      var k = dist(p, { x: drag.x0, y: drag.y0 }) / drag.d0;
+      k = clamp(k, 0.08, 12);
+      l.w = Math.max(12, drag.w0 * k);
+      l.h = Math.max(12, drag.h0 * k);
+      l.x = drag.x0; l.y = drag.y0;
+    } else if (drag.mode === "rotate"){
+      var a = Math.atan2(p.y - drag.y0, p.x - drag.x0);
+      var r = drag.r0 + (a - drag.a0);
+      if (e.shiftKey) r = Math.round(r / (Math.PI / 12)) * (Math.PI / 12);
+      l.rot = r;
+    }
+    syncUI(true);
+    render();
+  });
+
+  function snapMove(l){
+    var tol = 8 / S.view.scale;
+    var xs = [0, S.W / 2, S.W], ys = [0, S.H / 2, S.H];
+    S.layers.forEach(function(o){
+      if (o.id === l.id || !o.visible) return;
+      xs.push(o.x - o.w / 2, o.x, o.x + o.w / 2);
+      ys.push(o.y - o.h / 2, o.y, o.y + o.h / 2);
+    });
+    var edgeX = [l.x - l.w / 2, l.x, l.x + l.w / 2];
+    var edgeY = [l.y - l.h / 2, l.y, l.y + l.h / 2];
+    var bx = null, by = null;
+    edgeX.forEach(function(e){
+      xs.forEach(function(c){
+        var d = Math.abs(e - c);
+        if (d < tol && (!bx || d < bx.d)) bx = { d: d, delta: c - e, v: c };
+      });
+    });
+    edgeY.forEach(function(e){
+      ys.forEach(function(c){
+        var d = Math.abs(e - c);
+        if (d < tol && (!by || d < by.d)) by = { d: d, delta: c - e, v: c };
+      });
+    });
+    if (bx) l.x += bx.delta;
+    if (by) l.y += by.delta;
+    S.guides = [];
+    if (bx) S.guides.push({ axis: "x", v: bx.v });
+    if (by) S.guides.push({ axis: "y", v: by.v });
+  }
+
+  function endDrag(){
+    drag = null;
+    S.guides = null;
+    render();
+  }
+  cv.addEventListener("pointerup", endDrag);
+  cv.addEventListener("pointercancel", endDrag);
+
+  cv.addEventListener("wheel", function(e){
+    e.preventDefault();
+    var p = toScene(e);
+    var k = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+    var ns = clamp(S.view.scale * k, 0.05, 4);
+    var r = cv.getBoundingClientRect();
+    S.view.x = p.sx - (p.x * ns);
+    S.view.y = p.sy - (p.y * ns);
+    S.view.scale = ns;
+    render();
+  }, { passive: false });
+
+  document.addEventListener("keydown", function(e){
+    var tag = (e.target && e.target.tagName) || "";
+    if (tag === "INPUT" || tag === "TEXTAREA") return;
+    var l = selLayer();
+    if (!l) return;
+    var n = e.shiftKey ? 10 : 1;
+    if (e.key === "Delete" || e.key === "Backspace"){
+      deleteSel(); e.preventDefault();
+    } else if (e.key === "ArrowLeft"){ l.x -= n; render(); e.preventDefault(); }
+    else if (e.key === "ArrowRight"){ l.x += n; render(); e.preventDefault(); }
+    else if (e.key === "ArrowUp"){ l.y -= n; render(); e.preventDefault(); }
+    else if (e.key === "ArrowDown"){ l.y += n; render(); e.preventDefault(); }
+    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "d"){ dupSel(); e.preventDefault(); }
+  });
+
+  /* ---------------- 面板 ---------------- */
+  var listEl = document.getElementById("layerList");
+  var varEl = document.getElementById("variants");
+  var bgEl = document.getElementById("bgSwatch");
+
+  var BGS = ["#0c1424", "#0b1a16", "#141021", "#1a1410", "#0f1520"];
+  BGS.forEach(function(c){
+    var i = document.createElement("i");
+    i.style.background = c;
+    if (c === S.bg) i.className = "on";
+    i.onclick = function(){ S.bg = c; Array.prototype.forEach.call(bgEl.children, function(x){ x.className = ""; }); i.className = "on"; render(); };
+    bgEl.appendChild(i);
+  });
+
+  function syncUI(light){
+    var cur = selLayer();
+    if (light){
+      if (cur){
+        document.getElementById("inW").value = Math.round(cur.w);
+        document.getElementById("inH").value = Math.round(cur.h);
+        document.getElementById("inRot").value = Math.round(cur.rot * 180 / Math.PI);
+      }
+      return;
+    }
+    // 图层行
+    listEl.innerHTML = "";
+    for (var i = S.layers.length - 1; i >= 0; i--){
+      (function(l){
+        var row = document.createElement("div");
+        row.className = "row" + (l.id === S.sel ? " on" : "");
+        var eye = document.createElement("span");
+        eye.className = "ic"; eye.textContent = l.visible ? "◉" : "○";
+        eye.onclick = function(ev){ ev.stopPropagation(); l.visible = !l.visible; syncUI(); render(); };
+        var nm = document.createElement("span");
+        nm.className = "nm" + (l.visible ? "" : " dim");
+        nm.textContent = l.name;
+        var lk = document.createElement("span");
+        lk.className = "tg" + (l.locked ? " on" : "");
+        lk.textContent = l.locked ? "🔒" : "🔓";
+        lk.onclick = function(ev){ ev.stopPropagation(); l.locked = !l.locked; syncUI(); render(); };
+        row.appendChild(eye); row.appendChild(nm); row.appendChild(lk);
+        row.onclick = function(){ S.sel = l.id; syncUI(); render(); };
+        listEl.appendChild(row);
+      })(S.layers[i]);
+    }
+
+    var l = selLayer();
+    var dis = !l;
+    ["inName", "inW", "inH", "inRot", "inOpa", "ckShadow", "inPrompt"].forEach(function(id){
+      document.getElementById(id).disabled = dis;
+    });
+    document.getElementById("btnRegen").classList.toggle("disabled", dis);
+
+    if (!l){
+      varEl.innerHTML = '<div style="color:#5d6f8c;font-size:12px;grid-column:1/-1">左边点一个图层</div>';
+      return;
+    }
+    if (!light){
+      document.getElementById("inName").value = l.name;
+      document.getElementById("inW").value = Math.round(l.w);
+      document.getElementById("inH").value = Math.round(l.h);
+      document.getElementById("inRot").value = Math.round(l.rot * 180 / Math.PI);
+      document.getElementById("inOpa").value = l.opacity;
+      document.getElementById("ckShadow").checked = l.shadow;
+      document.getElementById("inPrompt").value = l.prompt || "";
+    } else {
+      document.getElementById("inW").value = Math.round(l.w);
+      document.getElementById("inH").value = Math.round(l.h);
+      document.getElementById("inRot").value = Math.round(l.rot * 180 / Math.PI);
+    }
+
+    // 变体缩略图
+    varEl.innerHTML = "";
+    for (var v = 0; v < 8; v++){
+      (function(vv){
+        var box = document.createElement("div");
+        box.className = "vw" + (vv === l.variant ? " on" : "");
+        var c = document.createElement("canvas");
+        c.width = 112; c.height = 112;
+        var c2 = c.getContext("2d");
+        c2.translate(56, 56);
+        var fit = 84 / Math.max(l.w, l.h);
+        drawPart(c2, l.kind, l.w * fit, l.h * fit, vv);
+        var sp = document.createElement("span"); sp.textContent = String(vv + 1);
+        box.appendChild(c); box.appendChild(sp);
+        box.onclick = function(){ l.variant = vv; syncUI(); render(); };
+        varEl.appendChild(box);
+      })(v);
+    }
+  }
+
+  function deleteSel(){
+    var l = selLayer(); if (!l || l.locked) return;
+    S.layers = S.layers.filter(function(o){ return o.id !== l.id; });
+    S.sel = null; syncUI(); render();
+  }
+  function dupSel(){
+    var l = selLayer(); if (!l || l.locked) return;
+    var c = addLayer({ kind: l.kind, name: l.name + " 副本", x: l.x + 40, y: l.y + 40, w: l.w, h: l.h, rot: l.rot, variant: l.variant, index: S.layers.indexOf(l) + 1 });
+    S.sel = c.id; syncUI(); render();
+  }
+
+  document.getElementById("btnAdd").onclick = function(){
+    var kind = document.getElementById("addKind").value;
+    var size = { nucleus: [260, 240], mito: [180, 84], golgi: [220, 130], vesicle: [60, 60], membrane: [900, 700] }[kind];
+    var l = addLayer({ kind: kind, name: { nucleus: "细胞核", mito: "线粒体", golgi: "高尔基体", vesicle: "囊泡", membrane: "细胞膜" }[kind] + " 新", x: S.W / 2, y: S.H / 2, w: size[0], h: size[1], variant: 0 });
+    S.sel = l.id; syncUI(); render();
+  };
+
+  document.getElementById("inName").oninput = function(){ var l = selLayer(); if (l){ l.name = this.value; syncUI(); } };
+  document.getElementById("inW").oninput = function(){ var l = selLayer(); if (l){ l.w = Math.max(8, +this.value || 8); render(); } };
+  document.getElementById("inH").oninput = function(){ var l = selLayer(); if (l){ l.h = Math.max(8, +this.value || 8); render(); } };
+  document.getElementById("inRot").oninput = function(){ var l = selLayer(); if (l){ l.rot = (+this.value || 0) * Math.PI / 180; render(); } };
+  document.getElementById("inOpa").oninput = function(){ var l = selLayer(); if (l){ l.opacity = +this.value; render(); } };
+  document.getElementById("ckShadow").onchange = function(){ var l = selLayer(); if (l){ l.shadow = this.checked; render(); } };
+  document.getElementById("inPrompt").oninput = function(){ var l = selLayer(); if (l) l.prompt = this.value; };
+
+  document.querySelectorAll("[data-z]").forEach(function(b){
+    b.onclick = function(){
+      var l = selLayer(); if (!l) return;
+      var i = S.layers.indexOf(l);
+      S.layers.splice(i, 1);
+      if (b.dataset.z === "top") S.layers.push(l);
+      else if (b.dataset.z === "bottom") S.layers.unshift(l);
+      else if (b.dataset.z === "up") S.layers.splice(Math.min(S.layers.length, i + 1), 0, l);
+      else S.layers.splice(Math.max(0, i - 1), 0, l);
+      syncUI(); render();
+    };
+  });
+
+  document.querySelectorAll("[data-align]").forEach(function(b){
+    b.onclick = function(){
+      var l = selLayer(); if (!l) return;
+      var a = b.dataset.align;
+      if (a === "cx") l.x = S.W / 2;
+      else if (a === "cy") l.y = S.H / 2;
+      else if (a === "dup") return dupSel();
+      else if (a === "del") return deleteSel();
+      render(); syncUI(true);
+    };
+  });
+
+  document.getElementById("ckGrid").onchange = function(){ S.grid = this.checked; render(); };
+  document.getElementById("ckSnap").onchange = function(){ S.snap = this.checked; };
+  document.getElementById("btnDemo").onclick = demo;
+  document.getElementById("zIn").onclick = function(){ S.view.scale = clamp(S.view.scale * 1.2, 0.05, 4); render(); };
+  document.getElementById("zOut").onclick = function(){ S.view.scale = clamp(S.view.scale / 1.2, 0.05, 4); render(); };
+  document.getElementById("zFit").onclick = function(){ fitView(); render(); };
+
+  document.getElementById("btnExport").onclick = function(){
+    var off = document.createElement("canvas");
+    off.width = S.W; off.height = S.H;
+    var c = off.getContext("2d");
+    c.translate(S.W / 2, S.H / 2);
+    S.layers.forEach(function(l){ if (l.visible) drawLayer(c, l); });
+    var a = document.createElement("a");
+    a.download = "场景-" + Date.now() + ".png";
+    a.href = off.toDataURL("image/png");
+    a.click();
+  };
+
+  window.addEventListener("resize", function(){ render(); });
+
+  /* ---------------- 启动 ---------------- */
+  demo();
+})();
+</script>
+</body>
+</html>

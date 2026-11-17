@@ -1,0 +1,67 @@
+{
+ "shapes": {
+  "rounded": {
+   "aspect": 3.3077,
+   "inset": {
+    "left": 0.02,
+    "right": 0.02,
+    "top": 0.06,
+    "bottom": 0.06
+   }
+  },
+  "bubble_left": {
+   "aspect": 3.5077,
+   "inset": {
+    "left": 0.077,
+    "right": 0.02,
+    "top": 0.06,
+    "bottom": 0.06
+   }
+  },
+  "bubble_right": {
+   "aspect": 3.5077,
+   "inset": {
+    "left": 0.02,
+    "right": 0.077,
+    "top": 0.06,
+    "bottom": 0.06
+   }
+  },
+  "bubble_top": {
+   "aspect": 2.7564,
+   "inset": {
+    "left": 0.02,
+    "right": 0.02,
+    "top": 0.2067,
+    "bottom": 0.06
+   }
+  },
+  "bubble_bottom": {
+   "aspect": 2.7564,
+   "inset": {
+    "left": 0.02,
+    "right": 0.02,
+    "top": 0.06,
+    "bottom": 0.2067
+   }
+  },
+  "pill": {
+   "aspect": 3.3077,
+   "inset": {
+    "left": 0.02,
+    "right": 0.02,
+    "top": 0.06,
+    "bottom": 0.06
+   }
+  },
+  "tag": {
+   "aspect": 3.3077,
+   "inset": {
+    "left": 0.02,
+    "right": 0.0805,
+    "top": 0.06,
+    "bottom": 0.06
+   }
+  }
+ }
+}

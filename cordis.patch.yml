@@ -1,0 +1,6 @@
+# 自注册入口：DSH 的 bundle 机制读取本文件，把插件插进 profile 的配置树。
+# 想改配置不必改这里，改 ~/.dsh-image-generation-ks/config.json，
+# 或在 profile 的 cordis.patch.yml 里给这条 entry 加 config。
+- insert:
+    - id: image-generation-ks
+      name: '@kittensleepwalk/dsh-image-generation'
